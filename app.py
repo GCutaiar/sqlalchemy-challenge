@@ -1,29 +1,92 @@
+import numpy as np
+import sqlalchemy
+from sqlalchemy.ext.automap import automap_base
+from sqlalchemy.orm import Session
+from sqlalchemy import create_engine, func
 from flask import Flask, jsonify
+
+
+engine = create_engine("sqlite:///Resources/hawaii.sqlite")
+
+Base = automap_base()
+Base.prepare(engine, reflect=True)
+
+Measurement = Base.classes.measurement
+Station = Base.classes.station
+
 app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "Routes Available"
-    # declare available routes
+    """Available Routes"""
+    return (f"Precipitation Analysis: /api/v1.0/precipitation <p>"
+            f"Station List: /api/v1.0/stations <p>"
+            f"Temperature Observation: /api/v1.0/stations <p>"
+            f"Start and end range: /api/v1.0/&lt;start&gt;, /api/v1.0/&lt;start&gt;/&lt;end&gt; <p>"
+        )
 
-@app.route("/api/v1.0/Precipitation")
+@app.route("/api/v1.0/precipitation")
 def prcp():
-    return # JSON dictionary of query {date:prcp}
+    session = Session(engine)
 
-@app.route("/api/v1.0/Stations")
+    dates_last = session.query(Measurement.date).\
+        order_by(Measurement.date.desc()).first()
+
+    dates_12 = session.query(Measurement.date, Measurement.prcp).\
+    filter(Measurement.date >= '2016-08-23').\
+    order_by(Measurement.date).all()
+
+    session.close()
+
+    all_prcp_dates = []
+    for date, prcp in dates_12:
+        rain_days = {}
+        rain_days["date"] = date
+        rain_days["prcp"] = prcp
+        all_prcp_dates.append(rain_days)
+    return jsonify(all_prcp_dates)
+
+@app.route("/api/v1.0/stations")
 def stat():
-    return #JSON list of station names and numbers
+    session = Session(engine)
 
-@app.route("/api/v1.0/TOBS")
+    stations = session.query(Station.station).all()
+
+    session.close()
+
+    all_stations = list(np.ravel(stations))
+
+    return jsonify(all_stations)
+
+@app.route("/api/v1.0/tobs")
 def tobs():
-    return #query dates and temps from previous year
-        #return JSON list of Temperature Observations
+    session = Session(engine)
+
+    tobs_12 = session.query(Measurement.tobs).\
+    filter(Measurement.date >= '2016-08-23').all()
+
+    session.close()
+
+    year_temps = list(np.ravel(tobs_12))
+
+    return jsonify(year_temps)
 
 @app.route("/api/v1.0/<start>")
-@app.route("/api/v1.0/<start>/<end>")
-# if start or start-end date entered, JSON list TMIN,TAVG,TMAX
-# if only start, calculate TMIN, TAVG, TMAX all dates>=start date
-# if both start and end, TMIN, TAVG, TMIN between dates including end points
+def start(start):
+    session = Session(engine)
+
+    temp_query = session.query(func.max(Measurement.tobs),func.min(Measurement.tobs),\
+        func.avg(Measurement.tobs)).filter(Measurement.date >=start).all()
+
+    session.close()
+
+    temp_results = list(np.ravel(temp_query))
+
+    return jsonify(temp_results)
+# @app.route("/api/v1.0/<start>/<end>")
+# # if start or start-end date range entered, JSON list TMIN,TAVG,TMAX
+# # if only start, calculate TMIN, TAVG, TMAX all dates>=start date
+# # if both start and end, TMIN, TAVG, TMIN between dates including end points
 
 if __name__ == "__main__":
     app.run(debug=True)
