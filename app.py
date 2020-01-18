@@ -77,16 +77,25 @@ def start(start):
 
     temp_query = session.query(func.max(Measurement.tobs),func.min(Measurement.tobs),\
         func.avg(Measurement.tobs)).filter(Measurement.date >=start).all()
-
+  
     session.close()
 
     temp_results = list(np.ravel(temp_query))
 
     return jsonify(temp_results)
-# @app.route("/api/v1.0/<start>/<end>")
-# # if start or start-end date range entered, JSON list TMIN,TAVG,TMAX
-# # if only start, calculate TMIN, TAVG, TMAX all dates>=start date
-# # if both start and end, TMIN, TAVG, TMIN between dates including end points
+@app.route("/api/v1.0/<start>/<end>")
+def range (start, end):
+    session = Session(engine)
+
+    temp_query = session.query(func.max(Measurement.tobs),func.min(Measurement.tobs),\
+        func.avg(Measurement.tobs)).filter(Measurement.date >=start).\
+            filter(Measurement.date <=end).all()
+  
+    session.close()
+
+    temp_results = list(np.ravel(temp_query))
+
+    return jsonify(temp_results)
 
 if __name__ == "__main__":
     app.run(debug=True)
